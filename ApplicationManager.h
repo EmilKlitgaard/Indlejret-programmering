@@ -34,6 +34,9 @@
 #define LCD_UPDATE_DELAY    200
 #define TRANSITION_DELAY    1000
 
+// Conversion macro for milliseconds to seconds (for production rate calculations)
+#define TO_SECOND(ms)      ((ms) / 1000.0)
+
 /*****************************    Types    *******************************/
 
 /* Menu navigation state */
@@ -55,9 +58,11 @@ typedef struct {
 /* Production state */
 typedef struct {
     INT32U start_ticks;
-    INT32U filter_start_ticks;
-    INT32U filter_last_activity_ticks;
-    INT16U filter_dispensed_cl_x100;
+    INT32U last_activity_ticks;
+    INT32U last_inactivity_ticks;
+    BOOLEAN button_pressed;
+    INT32U dispensed_stopped_ms;
+    FP32 dispensed_cl;
     INT8U production_stage;
 } ProductionState;
 
@@ -72,6 +77,7 @@ typedef struct {
     INT8U system_state;
     INT8U selected_product;
     INT8U payment_method;
+    INT32U timestamp;
     
     MenuState product_menu;
     MenuState payment_menu;

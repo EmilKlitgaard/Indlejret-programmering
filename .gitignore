@@ -1,1 +1,11 @@
 /.DS_Store
+/.o
+/.bin
+/.elf
+/.map
+/.d
+/.log
+/.bak
+/.tmp
+/.out
+/.obj

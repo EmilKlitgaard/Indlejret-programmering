@@ -62,37 +62,27 @@ void set_product_price(INT8U product_id, INT16U price) {
     }
 }
 
+/**
+ * Check if both last card_number and last PIN have the same parity (all odd or all even)
+ * Returns true if valid, false otherwise
+ */
 BOOLEAN validate_card_payment(INT8U *card_number, INT8U *pin) {
     INT8U i;
-    BOOLEAN card_parity_odd = false;
-    BOOLEAN pin_parity_odd = false;
+    BOOLEAN card_parity_even = false;
+    BOOLEAN pin_parity_even = false;
     
-    // Check card number parity (first digit determines)
-    if (card_number[0] & 0x01) {
-        card_parity_odd = true;
+    // Check card number parity (last digit determines)
+    if ((card_number[15] % 2) == 0) {
+        card_parity_even = true;
     }
-    
-    // Check if all card digits have same parity
-    for (i = 1; i < 16; i++) {
-        if ((card_number[i] & 0x01) != (card_parity_odd ? 1 : 0)) {
-            return false;
-        }
-    }
-    
-    // Check PIN parity (first digit determines)
-    if (pin[0] & 0x01) {
-        pin_parity_odd = true;
-    }
-    
-    // Check if all PIN digits have same parity
-    for (i = 1; i < 4; i++) {
-        if ((pin[i] & 0x01) != (pin_parity_odd ? 1 : 0)) {
-            return false;
-        }
+
+    // Check PIN parity (last digit determines)
+    if ((pin[3] % 2) == 0) {
+        pin_parity_even = true;
     }
     
     // Both must have same parity (both odd or both even)
-    return (card_parity_odd == pin_parity_odd);
+    return (card_parity_even == pin_parity_even);
 }
 
 void start_transaction(INT8U product_id) {

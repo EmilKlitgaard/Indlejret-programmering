@@ -43,6 +43,22 @@
 extern volatile INT8U pending_button;
 
 /*****************************   Functions   *******************************/
+extern INT8U read_button_sw1(void);
+/****************************************************************************
+*   Input    : -   
+*   Output   : Button state (0 or 1)
+*   Function : Read SW1 button state (active low)
+******************************************************************************/
+
+
+extern INT8U read_button_sw2(void);
+/****************************************************************************
+*   Input    : -
+*   Output   : Button state (0 or 1)
+*   Function : Read SW2 button state (active low)
+******************************************************************************/
+
+
 extern void init_button_handler(void);
 /****************************************************************************
 *   Input    : -

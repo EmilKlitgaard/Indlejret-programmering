@@ -32,20 +32,21 @@
 #include "Sleep.h"
 
 /*****************************    Defines    *******************************/
-#define INVALID_ENCODER_VALUE    0xFF   // Invalid encoder input
+#define INVALID_ENCODER_VALUE   0xFF   // Invalid encoder input
+#define ENCODER_PRESS           0xFE   // Special value for encoder button press
 
 // Encoder direction definitions
-#define ENCODER_STEADY           0      // No movement
-#define ENCODER_LEFT             1      // Encoder rotated left
-#define ENCODER_RIGHT            2      // Encoder rotated right
+#define ENCODER_STEADY          0      // No movement
+#define ENCODER_LEFT            1      // Encoder rotated left
+#define ENCODER_RIGHT           2      // Encoder rotated right
 
 // Encoder value limits and increments
-#define ENC_RIGHT_INCREMENT        20      // Amount to increment encoder value per right step
-#define ENC_LEFT_INCREMENT         5     // Amount to increment encoder value per left step
+#define ENC_RIGHT_INCREMENT     20      // Amount to increment encoder value per right step
+#define ENC_LEFT_INCREMENT      5     // Amount to increment encoder value per left step
 
 // Scan delays
-#define ENCODER_SCAN_MS      5
-#define ENCODER_SLEEP_MS     50
+#define ENCODER_SCAN_MS         5
+#define ENCODER_SLEEP_MS        50
 
 // PA5, PA6, PA7 for encoder pins
 #define ENC_A_PIN              0x20        // PA5 (channel A)

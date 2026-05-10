@@ -57,12 +57,12 @@ void toggle_led(INT8U color) {
 }
 
 
-void blink_led(INT8U color) {
+void blink_led(INT8U color, INT8U count, INT16U delay_ms) {
     int i;
-    for (i = 0; i < 3; i++) {
+    for (i=0; i<count; i++) {
         set_led(color);
-        sleep_ms(100);
+        sleep_ms(delay_ms);
         clear_led();
-        sleep_ms(100);
+        sleep_ms(delay_ms);
     }
 }

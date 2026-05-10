@@ -61,8 +61,7 @@ static void uart_write_string(const char *str) {
     }
 }
 
-void log_transaction_uart(INT8U product_id, INT16U price, INT16U amount_paid,
-                          INT8U payment_type) {
+void log_transaction_uart(INT8U product_id, INT16U price, INT16U amount_paid, INT8U payment_type) {
     TimeOfDay time = get_time();
     char log_msg[64];
     const char *product_name = "UNKNOWN";
@@ -83,12 +82,9 @@ void log_transaction_uart(INT8U product_id, INT16U price, INT16U amount_paid,
         payment_name = "CARD";
     }
     
-    snprintf(log_msg, sizeof(log_msg),
-             "%02d:%02d:%02d,%s,%d,%d,%s\n",
-             time.hour, time.minute, time.second,
-             product_name, price, quantity, payment_name);
-    
-    uart_write_string(log_msg);
+    // Error due to implementation errors between FreeRTOS and snprintf, crashes at next vTaskDelay...
+    //snprintf(log_msg, sizeof(log_msg), "%02d:%02d:%02d,%s,%d,%d,%s\n", time.hour, time.minute, time.second, product_name, price, quantity, payment_name);
+    uart_write_string("log_msg");
 }
 
 void handle_uart_command(void) {
@@ -127,9 +123,7 @@ void handle_uart_command(void) {
         case '2':
             // GET CLOCK: return '2' HH MM SS
             time = get_time();
-            snprintf(response, sizeof(response),
-                     "2%02d%02d%02d",
-                     time.hour, time.minute, time.second);
+            snprintf(response, sizeof(response), "2%02d%02d%02d\n", time.hour, time.minute, time.second);
             uart_write_string(response);
             break;
             
@@ -158,16 +152,13 @@ void handle_uart_command(void) {
                      (int)get_uptime_seconds());
             uart_write_string(response);
             break;
-            
-        default:
-            break;
     }
 }
 
 void uart_logger_task(void) {
-    for (;;) {
+    while (true) {
         handle_uart_command();
-        vTaskDelay(pdMS_TO_TICKS(100));
+        sleep_ms(100);
     }
 }
 

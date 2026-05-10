@@ -47,10 +47,10 @@ void init_button(void) {
 
 
 // Polling-based button reading function
-static INT8U read_button_sw1(void) {
+INT8U read_button_sw1(void) {
     return GPIO_PORTF_DATA_R & BUTTON_SW1;  // Read PF4 (SW1)
 }
-static INT8U read_button_sw2(void) {
+INT8U read_button_sw2(void) {
     return GPIO_PORTF_DATA_R & BUTTON_SW2;  // Read PF0 (SW2)
 }
 

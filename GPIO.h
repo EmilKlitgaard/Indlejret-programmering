@@ -68,10 +68,10 @@ void toggle_led(INT8U color);
 *   Function : Toggle LED color
 ******************************************************************************/
 
-void blink_led(INT8U color);
+void blink_led(INT8U color, INT8U count, INT16U delay_ms);
 /*****************************************************************************
-*   Input    : Color to blink
+*   Input    : Color to blink, number of blinks, delay in milliseconds
 *   Output   : -
-*   Function : Blink LED 3 times
+*   Function : Blink LED specified number of times with specified delay
 ******************************************************************************/
 

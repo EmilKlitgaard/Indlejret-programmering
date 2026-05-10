@@ -104,13 +104,14 @@ static void reset_app_context(void) {
     app.payment_state.input_stage = 0;
     
     app.production_state.start_ticks = 0;
-    app.production_state.filter_start_ticks = 0;
-    app.production_state.filter_last_activity_ticks = 0;
-    app.production_state.filter_dispensed_cl_x100 = 0;
+    app.production_state.last_activity_ticks = 0;
+    app.production_state.last_inactivity_ticks = 0;
+    app.production_state.button_pressed = false;
+    app.production_state.dispensed_stopped_ms = 0;
+    app.production_state.dispensed_cl = 0;
     app.production_state.production_stage = PROD_IDLE;
     
     app.interaction_state.cup_detected = false;
-    app.interaction_state.start_pressed = false;
     
     app.transaction = NULL;
 }
@@ -183,6 +184,16 @@ static void display_idle_menu(void) {
     clear_display();
     write_str_at(0, 0, "Welcome!");
     write_str_at(0, 1, "Press button");
+    sleep_ms(LCD_UPDATE_DELAY);
+}
+
+/**
+ * Display instructions for using the machine
+ */
+static void display_instructions_menu(void) {
+    clear_display();
+    write_str_at(0, 0, "Menu navigation:");
+    write_str_at(0, 1, "*=<   0=OK   #=>");
     sleep_ms(LCD_UPDATE_DELAY);
 }
 
@@ -272,13 +283,32 @@ static void display_production_status(INT8U product, INT32U elapsed_ms) {
             write_str_at(0, 0, "LATTE READY");
             write_str_at(0, 1, "Remove cup");
         }
-    } else if (product == PRODUCT_FILTER) {
-        write_str_at(0, 0, "FILTER COFFEE");
-        write_str_at(0, 1, "Press for more");
     }
     sleep_ms(100);
 }
 
+/**
+ * Display amount, unit price, and total price during filter coffee dispensing
+ */
+static void display_production_status_filter(INT16U amount, INT8U unit_price) {    
+    char line_1[17];
+    char line_2[17];
+    char line_3[17];
+
+    clear_display();
+    write_str_at(0, 0, "DISPENSING...");
+    format_display_line(line_1, "A:", amount);
+    write_str_at(0, 1, line_1);
+    format_display_line(line_2, "U:", unit_price);
+    write_str_at(5, 1, line_2);
+    format_display_line(line_3, "T:", amount * unit_price);
+    write_str_at(10, 1, line_3);
+    sleep_ms(100);
+}
+
+/**
+ * Initialize application manager
+ */
 void init_application_manager(void) {
     app.transaction_semaphore = xSemaphoreCreateBinary();
     configASSERT(app.transaction_semaphore != NULL);
@@ -302,7 +332,27 @@ static void handle_state_idle(void) {
         /* Initialize for new transaction */
         app.transaction = get_current_transaction();
         app.transaction->current_product = INVALID_INPUT;
+        app.timestamp = xTaskGetTickCount();
         
+        app.system_state = STATE_INSTRUCTION;
+    }
+}
+
+/**
+ * INSTRUCTIONS State: Display instructions for menu navigation
+ * Move to SELECTION state on any button press or if 3 seconds have passed since state started (timeout)
+ */
+static void handle_state_instructions(void) {
+    set_input(INPUT_MODE, MODE_BUTTON);
+    
+    display_instructions_menu();
+
+    // Timeout after 3 seconds
+    if (xTaskGetTickCount() > app.timestamp + pdMS_TO_TICKS(5000)) {
+        app.system_state = STATE_SELECTION;
+     
+    // Await button press
+    } else if (button_pressed(BUTTON_INPUT_SW1) || button_pressed(BUTTON_INPUT_SW2)) {
         app.system_state = STATE_SELECTION;
     }
 }
@@ -385,7 +435,7 @@ static void handle_state_payment_process(void) {
         set_input(INPUT_MODE, MODE_ENCODER);
         
         INT8U encoder_value = get_queue(ENCODER_INPUT);
-        if (encoder_value != INVALID_QUEUE_ID) {
+        if ((encoder_value != INVALID_QUEUE_ID) && (encoder_value != ENCODER_PRESS)) {
             /* Encoder returns +5 or +20 (or negative equivalents) */
             app.payment_state.cash_amount += encoder_value;
             
@@ -393,48 +443,66 @@ static void handle_state_payment_process(void) {
             app.transaction->amount_paid = app.payment_state.cash_amount;
         }
         
-        /* Always display current accumulated amount */
-        clear_display();
-        write_str_at(0, 0, "Inserted cash:");
-        format_display_line(display_buffer, "DKK: ", app.transaction->amount_paid);
-        write_str_at(0, 1, display_buffer);
-        format_display_line(display_buffer, "/  ", app.transaction->amount_required);
-        write_str_at(9, 1, display_buffer);
-        
-        /* Check if payment is complete */
-        if (is_payment_complete()) {
-            /* Dispense change if an amount is owed */
-            INT8U change_dkk = app.transaction->amount_paid - app.transaction->amount_required;
-            if (change_dkk > 0) {
-                clear_display();
-                write_str_at(0, 0, "Dispensing!");
-                format_display_line(display_buffer, "Change: ", change_dkk);
-                write_str_at(0, 1, display_buffer);
-                
-                /* Flash green LED once per DKK coin */
-                INT8U i;
-                for (i=0; i<change_dkk; i++) {
-                    set_led(GREEN);
-                    sleep_ms(200);  /* LED on for 200ms */
-                    clear_led();
-                    sleep_ms(200);  /* LED off for 200ms */
+        // Normal coffee case: Display current amount and check for completion
+        if (app.selected_product != PRODUCT_FILTER) {
+            /* Always display current accumulated amount */
+            clear_display();
+            write_str_at(0, 0, "Inserted cash:");
+            format_display_line(display_buffer, "DKK: ", app.transaction->amount_paid);
+            write_str_at(0, 1, display_buffer);
+            format_display_line(display_buffer, "/  ", app.transaction->amount_required);
+            write_str_at(9, 1, display_buffer);
+            
+            /* Check if payment is complete */
+            if (is_payment_complete()) {
+                /* Dispense change if an amount is owed */
+                INT8U change_dkk = app.transaction->amount_paid - app.transaction->amount_required;
+                if (change_dkk > 0) {
+                    clear_display();
+                    write_str_at(0, 0, "Dispensing!");
+                    format_display_line(display_buffer, "Change: ", change_dkk);
+                    write_str_at(0, 1, display_buffer);
+                    
+                    // Flash green LED once per DKK coin
+                    INT8U i;
+                    blink_led(GREEN, change_dkk, 200);
                 }
+    
+                clear_display();
+                write_str_at(0, 0, "Payment accepted!");
+                write_str_at(0, 1, "Proceeding...");
+                sleep_ms(TRANSITION_DELAY);
+                display_cup_detection_menu();
+    
+                app.system_state = STATE_WAITING_CUP;
             }
 
+        // Filter coffee case: Add prepaid amount and continue on roter press.
+        } else {
+            /* For filter coffee, just display current amount and allow user to keep adding */
             clear_display();
-            write_str_at(0, 0, "Payment accepted!");
-            write_str_at(0, 1, "Proceeding...");
-            sleep_ms(TRANSITION_DELAY);
-            display_cup_detection_menu();
+            write_str_at(0, 0, "Inserted cash:");
+            format_display_line(display_buffer, "DKK: ", app.transaction->amount_paid);
+            write_str_at(0, 1, display_buffer);
 
-            app.system_state = STATE_WAITING_CUP;
+            // Check for encoder button press to proceed with current inserted cash amount
+            if (encoder_value == ENCODER_PRESS) {
+                clear_display();
+                write_str_at(0, 0, "Payment accepted!");
+                write_str_at(0, 1, "Proceeding...");
+                sleep_ms(TRANSITION_DELAY);
+                display_cup_detection_menu();
+
+                app.system_state = STATE_WAITING_CUP;
+            }
         }
+
 
     } else if (app.payment_method == PAYMENT_METHOD_CARD) {
         set_input(INPUT_MODE, MODE_NUMPAD);
         
         INT8U numpad_input = get_queue(NUMPAD_INPUT);
-        if (numpad_input != INVALID_QUEUE_ID && numpad_input != 0) {
+        if ((numpad_input != INVALID_QUEUE_ID) && (numpad_input >= 0) && (numpad_input <= 9)) {
             if (app.payment_state.input_stage == 0) {
                 if (app.payment_state.input_index < 16) {
                     /* Store the digit */
@@ -455,6 +523,10 @@ static void handle_state_payment_process(void) {
                         write_str_at(0, 0, "Enter PIN:");
                         sleep_ms(LCD_UPDATE_DELAY);
                     }
+                } else {
+                    // Handle error: Reset to last valid state
+                    app.payment_state.input_stage = 0;
+                    app.payment_state.input_index = 0;
                 }
             } else if (app.payment_state.input_stage == 1) {
                 if (app.payment_state.input_index < 4) {
@@ -498,6 +570,10 @@ static void handle_state_payment_process(void) {
                             write_str_at(0, 1, "Typed: 0");
                         }
                     }
+                } else {
+                    // Handle error: Reset to last valid state
+                    app.payment_state.input_stage = 0;
+                    app.payment_state.input_index = 0;
                 }
             }
         }
@@ -512,26 +588,27 @@ static void handle_state_cup_detection(void) {
     set_input(INPUT_MODE, MODE_BUTTON);
     
     if (button_pressed(BUTTON_INPUT_SW1)) {
+        // Cup placed
         app.interaction_state.cup_detected = true;
         clear_display();
         write_str_at(0, 0, "Cup detected!");
         write_str_at(0, 1, "Press START");
 
     } else if ((button_pressed(BUTTON_INPUT_SW2)) && (app.interaction_state.cup_detected)) {        
-        /* Now start production */
-        app.interaction_state.start_pressed = true;
-        app.system_state = STATE_PRODUCTION;
-        app.production_state.start_ticks = xTaskGetTickCount();
-        app.production_state.filter_start_ticks = xTaskGetTickCount();
-        app.production_state.filter_last_activity_ticks = xTaskGetTickCount();
-        
+        // Start production
         clear_display();
         write_str_at(0, 0, "Starting");
         write_str_at(0, 1, "production...");
         sleep_ms(TRANSITION_DELAY);
+
+        app.system_state = STATE_PRODUCTION;
+        app.production_state.button_pressed = true;
+        app.production_state.start_ticks = xTaskGetTickCount();
+        app.production_state.last_activity_ticks = app.production_state.start_ticks;
+        app.production_state.last_inactivity_ticks = app.production_state.start_ticks;
         
     } else if ((button_pressed(BUTTON_INPUT_SW2)) && (!app.interaction_state.cup_detected)) {
-        /* Start pressed without cup */
+        // Start pressed without cup
         clear_display();
         write_str_at(0, 0, "No cup detected!");
         write_str_at(0, 1, "Place cup first");
@@ -547,47 +624,69 @@ static void handle_state_production(void) {
     
     INT8U product = app.selected_product;
     
-    if (product == PRODUCT_ESPRESSO || product == PRODUCT_LATTE) {
+    // Normal coffee case: 
+    if (product != PRODUCT_FILTER) {
         INT32U total_time = LED_GRIND_TIME + LED_BREW_TIME;
         if (product == PRODUCT_LATTE) {
             total_time += LED_FROTH_TIME;
         }
         
-        /* Control LEDs based on production stage */
+        // Control LEDs based on production stage
         if (elapsed_ms < LED_GRIND_TIME) {
-            set_led(YELLOW);  /* Grinding */
+            set_led(YELLOW);    // Grinding
         } else if (elapsed_ms < (LED_GRIND_TIME + LED_BREW_TIME)) {
-            set_led(RED);     /* Brewing */
+            set_led(RED);       // Brewing
         } else if (elapsed_ms < total_time) {
-            set_led(GREEN);   /* Frothing (Latte only) */
+            set_led(GREEN);     // Frothing (Latte only)
         } else {
-            clear_led();       /* Done */
+            clear_led();
             app.system_state = STATE_COMPLETE;
         }
         display_production_status(product, elapsed_ms);
-        
+    
+    // Filter coffee case:
     } else if (product == PRODUCT_FILTER) {
-        INT32U filter_elapsed_ms = (current_ticks - app.production_state.filter_start_ticks) * portTICK_PERIOD_MS;
-        INT32U inactivity_ms = (current_ticks - app.production_state.filter_last_activity_ticks) * portTICK_PERIOD_MS;
-        
-        /* Check for continued dispensing via START button */
-        if (button_pressed(BUTTON_INPUT_SW2)) {
-            app.production_state.filter_last_activity_ticks = current_ticks;
+        // Button pressed:
+        if ((read_button_sw2() == 0) && (!app.production_state.button_pressed)) {
+            set_led(YELLOW);
+            app.production_state.button_pressed = true;
+            app.production_state.dispensed_stopped_ms += (current_ticks - app.production_state.last_inactivity_ticks) * portTICK_PERIOD_MS;
+            app.production_state.last_activity_ticks = current_ticks;
+        // Button held down:
+        } else if ((read_button_sw2() == 0) && (app.production_state.button_pressed)) {
+            app.production_state.last_activity_ticks = current_ticks;
+        // Button released:
+        } else if ((read_button_sw2() != 0) && (app.production_state.button_pressed)) {
+            clear_led();
+            app.production_state.button_pressed = false;
+            app.production_state.last_inactivity_ticks = current_ticks;
+        // Button not pressed:
+        } else if ((read_button_sw2() != 0) && (!app.production_state.button_pressed)) {
+            app.production_state.dispensed_stopped_ms += ((current_ticks - app.production_state.start_ticks) * portTICK_PERIOD_MS) - app.production_state.last_inactivity_ticks;
         }
         
-        /* Dispense based on timing */
-        if (filter_elapsed_ms < FILTER_SLOW_RATE_MS && app.interaction_state.start_pressed && app.production_state.filter_dispensed_cl_x100 < app.transaction->amount_required * 100) {
-            set_led(YELLOW);  /* Slow dispensing */
-            app.production_state.filter_dispensed_cl_x100 = (INT16U)((FILTER_SLOW_CL / FILTER_SLOW_RATE_MS * 1000) * 100);
-        } else if (inactivity_ms < FILTER_INACTIVITY_TIME && app.interaction_state.start_pressed && app.production_state.filter_dispensed_cl_x100 < app.transaction->amount_required * 100) {
-            set_led(YELLOW);  /* Fast dispensing */
-            FP32 fast_dispensed = FILTER_FAST_RATE_CL * (inactivity_ms / 1000.0);
-            app.production_state.filter_dispensed_cl_x100 = (INT16U)(fast_dispensed * 100);
+        INT32U inactivity_ms = (current_ticks - app.production_state.last_activity_ticks) * portTICK_PERIOD_MS;
+        INT32S dispensed_ms = (INT32S)((current_ticks - app.production_state.start_ticks) * portTICK_PERIOD_MS) - (INT32S)app.production_state.dispensed_stopped_ms;
+        
+        // Control rate based on timing
+        if (dispensed_ms < FILTER_SLOW_RATE_MS) {
+            app.production_state.dispensed_cl = (INT16U)(FILTER_SLOW_CL * TO_SECOND(dispensed_ms));
         } else {
-            clear_led();       /* Done */
+            INT16U slow_dispensed_cl = (INT16U)(FILTER_SLOW_CL * TO_SECOND(FILTER_SLOW_RATE_MS));
+            INT16U fast_dispensed_cl = (INT16U)(FILTER_FAST_RATE_CL * TO_SECOND(dispensed_ms - FILTER_SLOW_RATE_MS));
+            app.production_state.dispensed_cl = (INT16U)(slow_dispensed_cl + fast_dispensed_cl);
+        }
+
+        // Check if dispensing is finished 
+        if ((app.payment_method == PAYMENT_METHOD_CASH) && (app.production_state.dispensed_cl > (app.transaction->amount_paid / get_product_price(product)))) {
+            clear_led();
+            app.system_state = STATE_COMPLETE;
+        } else if (inactivity_ms > FILTER_INACTIVITY_TIME) {
+            clear_led();
             app.system_state = STATE_COMPLETE;
         }
-        display_production_status(product, filter_elapsed_ms);
+        
+        display_production_status_filter(app.production_state.dispensed_cl, get_product_price(product));
     }
 }
 
@@ -601,11 +700,10 @@ static void handle_state_complete(void) {
         
     // Reset and return to idle when cup is removed (simulated by pressing SW1 again)
     if (button_pressed(BUTTON_INPUT_SW1)) {
-        log_transaction_uart(app.selected_product, app.transaction->amount_required, app.transaction->amount_paid, app.payment_method);
         log_transaction(app.payment_method, app.transaction->amount_paid);
+        log_transaction_uart(app.selected_product, app.transaction->amount_required, app.transaction->amount_paid, app.payment_method);
         reset_transaction();
         reset_app_context();
-        app.system_state = STATE_IDLE;
     }
 }
 
@@ -615,6 +713,10 @@ void application_task(void) {
         switch (app.system_state) {
             case STATE_IDLE:
                 handle_state_idle();
+                break;
+                
+            case STATE_INSTRUCTION:
+                handle_state_instructions();
                 break;
                 
             case STATE_SELECTION:
@@ -645,20 +747,6 @@ void application_task(void) {
                 reset_app_context();
                 break;
         }
-    }
-}
-
-void uart_interface_task(void) {
-    while (true) {
-        /* UART command processing task */
-        /* Command format:
-         * '1' = SET CLOCK (followed by HH MM SS)
-         * '2' = GET CLOCK
-         * '3' = SET PRICE (followed by product_id and price)
-         * '4' = GET REPORT
-         */
-        
-        sleep_ms(100);
     }
 }
 

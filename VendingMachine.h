@@ -38,12 +38,13 @@
 
 // System states
 #define STATE_IDLE              0
-#define STATE_SELECTION         1
-#define STATE_PAYMENT_METHOD    2
-#define STATE_PAYMENT_PROCESS   3
-#define STATE_WAITING_CUP       4
-#define STATE_PRODUCTION        5
-#define STATE_COMPLETE          6
+#define STATE_INSTRUCTION       1
+#define STATE_SELECTION         2
+#define STATE_PAYMENT_METHOD    3
+#define STATE_PAYMENT_PROCESS   4
+#define STATE_WAITING_CUP       5
+#define STATE_PRODUCTION        6
+#define STATE_COMPLETE          7
 
 // Production stage
 #define PROD_IDLE               0
@@ -60,7 +61,7 @@
 #define LED_FROTH_TIME          6200    // 6.2 seconds
 #define LED_CHANGE_FLASH        200     // 200ms per DKK coin
 #define FILTER_SLOW_RATE_MS     3000    // 3 seconds at slow rate
-#define FILTER_SLOW_CL          1.8     // 0.6 cl/s * 3s = 1.8 cl
+#define FILTER_SLOW_CL          0.6     // cl per second at slow rate
 #define FILTER_FAST_RATE_CL     1.45    // cl per second at fast rate
 #define FILTER_INACTIVITY_TIME  5000    // 5 seconds inactivity timeout
 

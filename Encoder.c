@@ -96,10 +96,10 @@ INT8U scan_encoder(void) {
             encoder_value = ENC_LEFT_INCREMENT;  // Decrement encoder value
         }
     }
-    
+
     // Check button press separately (falling edge on P2: 1 -> 0)
     if (last_p2 == 1 && cur_p2 == 0) {
-        // Encoder pressed
+        encoder_value = ENCODER_PRESS;  // Special value for button press
     }
     
     // Update button state for next cycle
