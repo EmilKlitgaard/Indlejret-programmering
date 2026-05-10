@@ -87,8 +87,7 @@ void log_transaction_uart(INT8U product_id, INT16U price, INT16U amount_paid,
     }
     
     snprintf(log_msg, sizeof(log_msg),
-             "%04d-%02d-%02d %02d:%02d:%02d,%s,%d,%d,%s\n",
-             time.year, time.month,  time.day,
+             "%02d:%02d:%02d,%s,%d,%d,%s\n",
              time.hour, time.minute, time.second,
              product_name, price, quantity, payment_name);
     
