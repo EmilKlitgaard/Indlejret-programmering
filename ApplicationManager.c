@@ -576,10 +576,10 @@ static void handle_state_production(void) {
         }
         
         /* Dispense based on timing */
-        if (filter_elapsed_ms < FILTER_SLOW_RATE_MS) {
+        if (filter_elapsed_ms < FILTER_SLOW_RATE_MS && app.interaction_state.start_pressed && app.production_state.filter_dispensed_cl_x100 < app.transaction->amount_required * 100) {
             set_led(YELLOW);  /* Slow dispensing */
             app.production_state.filter_dispensed_cl_x100 = (INT16U)((FILTER_SLOW_CL / FILTER_SLOW_RATE_MS * 1000) * 100);
-        } else if (inactivity_ms < FILTER_INACTIVITY_TIME && app.interaction_state.start_pressed) {
+        } else if (inactivity_ms < FILTER_INACTIVITY_TIME && app.interaction_state.start_pressed && app.production_state.filter_dispensed_cl_x100 < app.transaction->amount_required * 100) {
             set_led(YELLOW);  /* Fast dispensing */
             FP32 fast_dispensed = FILTER_FAST_RATE_CL * (inactivity_ms / 1000.0);
             app.production_state.filter_dispensed_cl_x100 = (INT16U)(fast_dispensed * 100);
