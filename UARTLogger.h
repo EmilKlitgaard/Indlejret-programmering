@@ -42,7 +42,7 @@ void log_transaction_uart(INT8U product_id, INT16U price, INT16U amount_paid,
 *   Input    : Product ID, Price, Amount Paid, Payment Type (CASH/CARD)
 *   Output   : -
 *   Function : Log transaction to UART
-*   Format   : HH:MM:SS,PRODUCT,PRICE,QUANTITY,PAYMENT\n
+*   Format   : YYYY:MM:DD,HH:MM:SS,PRODUCT,PRICE,QUANTITY,PAYMENT\n
 ******************************************************************************/
 
 void handle_uart_command(void);
