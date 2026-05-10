@@ -29,10 +29,12 @@
 /*****************************   Variables   *******************************/
 static INT8U uart_rx_buffer[64];
 static INT8U uart_rx_index = 0;
+static BOOLEAN command_ready = false;
 
 /*****************************   Functions   *******************************/
 void init_uart_logger(void) {
     uart_rx_index = 0;
+    command_ready = false;
     memset(uart_rx_buffer, 0, sizeof(uart_rx_buffer));
 }
 
@@ -92,6 +94,7 @@ void log_transaction_uart(INT8U product_id, INT16U price, INT16U amount_paid,
 }
 
 void handle_uart_command(void) {
+    INT8U ch;
     INT8U cmd;
     INT8U hour, minute, second;
     INT8U product_id;
@@ -99,73 +102,143 @@ void handle_uart_command(void) {
     MachineReport *report;
     TimeOfDay time;
     char response[64];
+    INT8U idx;
     
-    if (!uart_data_available()) {
+    /* Read available characters into buffer until newline */
+    while (uart_data_available() && uart_rx_index < 63) {
+        ch = uart_read_char();
+        
+        if (ch == '\n' || ch == '\r') {
+            /* End of command - mark as ready */
+            uart_rx_buffer[uart_rx_index] = '\0';
+            command_ready = true;
+            uart_rx_index = 0;
+            break;
+        } else if (ch >= 32 && ch < 127) {
+            /* Printable character - add to buffer */
+            uart_rx_buffer[uart_rx_index++] = ch;
+        }
+    }
+    
+    /* Process command if complete */
+    if (!command_ready) {
         return;
     }
     
-    cmd = uart_read_char();
+    command_ready = false;
+    
+    if (uart_rx_index == 0) {
+        return;  /* Empty command */
+    }
+    
+    cmd = uart_rx_buffer[0];
     
     switch (cmd) {
         case '1':
-            // SET CLOCK: format '1' HH MM SS
-            if (uart_data_available()) {
-                hour = uart_read_char() - '0';
-                hour = hour * 10 + (uart_read_char() - '0');
+            /* SET CLOCK: format "1 HH MM SS" (space-separated) */
+            idx = 1;
+            
+            /* Parse hour */
+            if (uart_rx_index > idx + 1) {
+                hour = (uart_rx_buffer[idx] - '0') * 10;
+                hour += (uart_rx_buffer[idx + 1] - '0');
+                idx += 2;
+                
+                /* Skip space */
+                if (idx < uart_rx_index && uart_rx_buffer[idx] == ' ') idx++;
+                
+                /* Parse minute */
+                if (uart_rx_index > idx + 1) {
+                    minute = (uart_rx_buffer[idx] - '0') * 10;
+                    minute += (uart_rx_buffer[idx + 1] - '0');
+                    idx += 2;
+                    
+                    /* Skip space */
+                    if (idx < uart_rx_index && uart_rx_buffer[idx] == ' ') idx++;
+                    
+                    /* Parse second */
+                    if (uart_rx_index > idx + 1) {
+                        second = (uart_rx_buffer[idx] - '0') * 10;
+                        second += (uart_rx_buffer[idx + 1] - '0');
+                        
+                        set_time(hour, minute, second);
+                        uart_write_string("OK\n");
+                    } else {
+                        uart_write_string("ERR\n");
+                    }
+                } else {
+                    uart_write_string("ERR\n");
+                }
+            } else {
+                uart_write_string("ERR\n");
             }
-            if (uart_data_available()) {
-                minute = uart_read_char() - '0';
-                minute = minute * 10 + (uart_read_char() - '0');
-            }
-            if (uart_data_available()) {
-                second = uart_read_char() - '0';
-                second = second * 10 + (uart_read_char() - '0');
-            }
-            set_time(hour, minute, second);
             break;
             
         case '2':
-            // GET CLOCK: return '2' HH MM SS
+            /* GET CLOCK: return "2 HH MM SS" */
             time = get_time();
             snprintf(response, sizeof(response),
-                     "2%02d%02d%02d",
+                     "2 %02d %02d %02d\n",
                      time.hour, time.minute, time.second);
             uart_write_string(response);
             break;
             
         case '3':
-            // SET PRICE: format '3' PRODUCT_ID PRICE
-            if (uart_data_available()) {
-                product_id = uart_read_char() - '0';
+            /* SET PRICE: format "3 PRODUCT_ID PRICE" (space-separated) */
+            idx = 1;
+            
+            /* Skip space */
+            if (idx < uart_rx_index && uart_rx_buffer[idx] == ' ') idx++;
+            
+            /* Parse product ID (single digit) */
+            if (idx < uart_rx_index && uart_rx_buffer[idx] >= '0' && uart_rx_buffer[idx] <= '9') {
+                product_id = uart_rx_buffer[idx] - '0';
+                idx++;
+                
+                /* Skip space */
+                if (idx < uart_rx_index && uart_rx_buffer[idx] == ' ') idx++;
+                
+                /* Parse price (variable digits) */
+                price = 0;
+                while (idx < uart_rx_index && uart_rx_buffer[idx] >= '0' && uart_rx_buffer[idx] <= '9') {
+                    price = price * 10 + (uart_rx_buffer[idx] - '0');
+                    idx++;
+                }
+                
+                if (price > 0 && product_id < MAX_PRODUCTS) {
+                    set_product_price(product_id, price);
+                    uart_write_string("OK\n");
+                } else {
+                    uart_write_string("ERR\n");
+                }
+            } else {
+                uart_write_string("ERR\n");
             }
-            if (uart_data_available()) {
-                price = uart_read_char() - '0';
-                price = price * 10 + (uart_read_char() - '0');
-            }
-            set_product_price(product_id, price);
             break;
             
         case '4':
-            // GET REPORT
+            /* GET REPORT */
             report = get_machine_report();
             snprintf(response, sizeof(response),
-                     "ESPRESSO:%d,LATTE:%d,FILTER:%d,CASH:%d,CARD:%d,TIME:%d\n",
+                     "4 ESP:%d LAT:%d FLT:%d CASH:%d CARD:%d\n",
                      (int)report->total_sales_espresso,
                      (int)report->total_sales_latte,
                      (int)report->total_sales_filter_cl,
                      (int)report->total_cash_sales,
-                     (int)report->total_card_sales,
-                     (int)get_uptime_seconds());
+                     (int)report->total_card_sales);
             uart_write_string(response);
             break;
             
         default:
+            uart_write_string("ERR\n");
             break;
     }
 }
 
+
+
 void uart_logger_task(void) {
-    for (;;) {
+    while(true) {
         handle_uart_command();
         vTaskDelay(pdMS_TO_TICKS(100));
     }
