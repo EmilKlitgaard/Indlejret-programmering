@@ -22,7 +22,6 @@
 #include <task.h>
 #include <stdio.h>
 #include <string.h>
-#include <time.h>
 #include "UARTLogger.h"
 #include "Print.h"
 #include "tm4c123gh6pm.h"
