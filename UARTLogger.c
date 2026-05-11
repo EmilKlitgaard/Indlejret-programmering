@@ -64,6 +64,16 @@ static void uart_write_string(const char *str) {
     }
 }
 
+static void send_clock_response(char *response, TimeOfDay time) {
+    response[0] = '2';
+    dec2(&response[1], time.hour);
+    dec2(&response[3], time.minute);
+    dec2(&response[5], time.second);
+    response[7] = '\n';
+    response[8] = '\0';
+    uart_write_string(response);
+}
+
 void log_transaction_uart(INT8U product_id, INT16U price, INT16U amount_paid, INT8U payment_type) {
     TimeOfDay time = get_time();
     char log_msg[64];
@@ -174,8 +184,7 @@ void handle_uart_command(void) {
         case '2':
             /* GET CLOCK: return "2 HH MM SS" */
             time = get_time();
-            snprintf(response, sizeof(response), "2%02d%02d%02d\n", time.hour, time.minute, time.second);
-            uart_write_string(response);
+            send_clock_response(response, time);
             break;
             
         case '3':
