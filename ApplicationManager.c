@@ -107,7 +107,8 @@ static void reset_app_context(void) {
     app.production_state.last_activity_ticks = 0;
     app.production_state.last_inactivity_ticks = 0;
     app.production_state.button_pressed = false;
-    app.production_state.dispensed_stopped_ms = 0;
+    app.production_state.dispensed_stopped_ticks = 0;
+    app.production_state.dispensed_stopped_total_ticks = 0;
     app.production_state.dispensed_cl = 0;
     app.production_state.production_stage = PROD_IDLE;
     
@@ -502,6 +503,7 @@ static void handle_state_payment_process(void) {
         set_input(INPUT_MODE, MODE_NUMPAD);
         
         INT8U numpad_input = get_queue(NUMPAD_INPUT);
+        if (numpad_input == 11) numpad_input = 0;  /* Map button 11 to digit 0 */
         if ((numpad_input != INVALID_QUEUE_ID) && (numpad_input >= 0) && (numpad_input <= 9)) {
             if (app.payment_state.input_stage == 0) {
                 if (app.payment_state.input_index < 16) {
@@ -606,6 +608,7 @@ static void handle_state_cup_detection(void) {
         app.production_state.start_ticks = xTaskGetTickCount();
         app.production_state.last_activity_ticks = app.production_state.start_ticks;
         app.production_state.last_inactivity_ticks = app.production_state.start_ticks;
+        set_input(INPUT_MODE, MODE_IDLE);
         
     } else if ((button_pressed(BUTTON_INPUT_SW2)) && (!app.interaction_state.cup_detected)) {
         // Start pressed without cup
@@ -650,7 +653,8 @@ static void handle_state_production(void) {
         if ((read_button_sw2() == 0) && (!app.production_state.button_pressed)) {
             set_led(YELLOW);
             app.production_state.button_pressed = true;
-            app.production_state.dispensed_stopped_ms += (current_ticks - app.production_state.last_inactivity_ticks) * portTICK_PERIOD_MS;
+            app.production_state.dispensed_stopped_total_ticks += app.production_state.dispensed_stopped_ticks;
+            app.production_state.dispensed_stopped_ticks = 0;
             app.production_state.last_activity_ticks = current_ticks;
         // Button held down:
         } else if ((read_button_sw2() == 0) && (app.production_state.button_pressed)) {
@@ -660,21 +664,22 @@ static void handle_state_production(void) {
             clear_led();
             app.production_state.button_pressed = false;
             app.production_state.last_inactivity_ticks = current_ticks;
+            app.production_state.dispensed_stopped_ticks = (current_ticks - app.production_state.last_activity_ticks);
         // Button not pressed:
         } else if ((read_button_sw2() != 0) && (!app.production_state.button_pressed)) {
-            app.production_state.dispensed_stopped_ms += ((current_ticks - app.production_state.start_ticks) * portTICK_PERIOD_MS) - app.production_state.last_inactivity_ticks;
+            app.production_state.dispensed_stopped_ticks = (current_ticks - app.production_state.last_inactivity_ticks);
         }
         
         INT32U inactivity_ms = (current_ticks - app.production_state.last_activity_ticks) * portTICK_PERIOD_MS;
-        INT32S dispensed_ms = (INT32S)((current_ticks - app.production_state.start_ticks) * portTICK_PERIOD_MS) - (INT32S)app.production_state.dispensed_stopped_ms;
-        
+        INT32S dispensed_ms = (INT32S)(((current_ticks - app.production_state.start_ticks) - (app.production_state.dispensed_stopped_total_ticks + app.production_state.dispensed_stopped_ticks)) * portTICK_PERIOD_MS);
+
         // Control rate based on timing
         if (dispensed_ms < FILTER_SLOW_RATE_MS) {
-            app.production_state.dispensed_cl = (INT16U)(FILTER_SLOW_CL * TO_SECOND(dispensed_ms));
+            app.production_state.dispensed_cl = (FP32)(FILTER_SLOW_CL * TO_SECOND(dispensed_ms));
         } else {
-            INT16U slow_dispensed_cl = (INT16U)(FILTER_SLOW_CL * TO_SECOND(FILTER_SLOW_RATE_MS));
-            INT16U fast_dispensed_cl = (INT16U)(FILTER_FAST_RATE_CL * TO_SECOND(dispensed_ms - FILTER_SLOW_RATE_MS));
-            app.production_state.dispensed_cl = (INT16U)(slow_dispensed_cl + fast_dispensed_cl);
+            FP32 slow_dispensed_cl = (FP32)(FILTER_SLOW_CL * TO_SECOND(FILTER_SLOW_RATE_MS));
+            FP32 fast_dispensed_cl = (FP32)(FILTER_FAST_RATE_CL * TO_SECOND(dispensed_ms - FILTER_SLOW_RATE_MS));
+            app.production_state.dispensed_cl = (FP32)(slow_dispensed_cl + fast_dispensed_cl);
         }
 
         // Check if dispensing is finished 

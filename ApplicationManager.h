@@ -61,7 +61,8 @@ typedef struct {
     INT32U last_activity_ticks;
     INT32U last_inactivity_ticks;
     BOOLEAN button_pressed;
-    INT32U dispensed_stopped_ms;
+    INT32U dispensed_stopped_ticks;
+    INT32U dispensed_stopped_total_ticks;
     FP32 dispensed_cl;
     INT8U production_stage;
 } ProductionState;
