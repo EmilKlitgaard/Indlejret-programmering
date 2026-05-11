@@ -81,24 +81,6 @@ void led_manager_task(void *pvParameters) {
             status_tick = 0;
         }
         
-        // --- MODE LED MANAGEMENT ---
-        // Update mode LEDs every STATE_UPDATE_INTERVAL ms
-        /*state_tick++;
-        if (state_tick >= (STATE_UPDATE_INTERVAL / 10)) {
-            system_mode = read_input(INPUT_MODE);
-            
-            // Update mode LED only if state/mode changed
-            if (system_mode == MODE_BUTTON) {
-                set_led(RED);
-            } else if (system_mode == MODE_NUMPAD) {
-                set_led(GREEN);
-            } else if (system_mode == MODE_ENCODER) {
-                set_led(BLUE);
-            }
-            
-            state_tick = 0;
-        }*/
-        
         // Sleep for 10ms tick
         sleep_ms(10);
     }

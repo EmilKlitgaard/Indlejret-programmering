@@ -22,7 +22,6 @@
 #include <task.h>
 #include <stdio.h>
 #include <string.h>
-#include <time.h>
 #include "UARTLogger.h"
 #include "Print.h"
 #include "tm4c123gh6pm.h"
@@ -111,22 +110,14 @@ void handle_uart_command(void) {
             command_ready = true;
             uart_rx_index = 0;
             break;
-        } else if (ch >= 32 && ch < 127) {
+
+        } else {
             /* Printable character - add to buffer */
             uart_rx_buffer[uart_rx_index++] = ch;
         }
     }
     
-    /* Process command if complete */
-    if (!command_ready) {
-        return;
-    }
-    
-    command_ready = false;
-    
-    if (uart_rx_index == 0) {
-        return;  /* Empty command */
-    }
+    if (!command_ready || uart_rx_buffer[uart_rx_index] == 0) return;         // Skip if not ready or empty
     
     cmd = uart_rx_buffer[0];
     
