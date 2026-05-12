@@ -20,6 +20,7 @@
 /***************************** Include files *******************************/
 #include <FreeRTOS.h>
 #include <semphr.h>
+#include "Sleep.h"
 #include "RealTimeClock.h"
 
 /*****************************   Variables   *******************************/
@@ -84,6 +85,13 @@ void increment_rtc(void) {
         }
         
         xSemaphoreGive(rtc_mutex);
+    }
+}
+
+void rtc_task(void) {
+    while (true) {
+        sleep_ms(1000);
+        increment_rtc();
     }
 }
 

@@ -36,6 +36,13 @@ void init_uart_logger(void);
 *   Function : Initialize UART logging
 ******************************************************************************/
 
+void send_clock_response(char *response, TimeOfDay time);
+/****************************************************************************
+*   Input    : Response buffer, TimeOfDay struct
+*   Output   : -
+*   Function : Format and send clock response over UART
+******************************************************************************/
+
 void log_transaction_uart(INT8U product_id, INT16U price, INT16U amount_paid,
                           INT8U payment_type);
 /****************************************************************************

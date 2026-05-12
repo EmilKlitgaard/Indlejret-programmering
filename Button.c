@@ -88,7 +88,7 @@ void button_task(void *pvParameters) {
             if ((last_sw1 != 0) && (current_sw1 == 0)) {
                 last_sw1 = current_sw1;
                 put_queue(BUTTON_INPUT_SW1, current_sw1);
-                print_var(current_sw1);
+                //print_var(current_sw1);
             } else if ((last_sw1 == 0) && (current_sw1 != 0)) {
                 /* Button released: update state */
                 last_sw1 = current_sw1;
@@ -97,7 +97,7 @@ void button_task(void *pvParameters) {
             if ((last_sw2 != 0) && (current_sw2 == 0)) {
                 last_sw2 = current_sw2;
                 put_queue(BUTTON_INPUT_SW2, current_sw2);
-                print_var(current_sw2);
+                //print_var(current_sw2);
             } else if ((last_sw2 == 0) && (current_sw2 != 0)) {
                 /* Button released: update state */
                 last_sw2 = current_sw2;

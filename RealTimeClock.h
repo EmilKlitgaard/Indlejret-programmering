@@ -72,6 +72,13 @@ extern void increment_rtc(void);
 *   Function : Increment RTC by one second (called from timer)
 ******************************************************************************/
 
+extern void rtc_task(void);
+/****************************************************************************
+*   Input    : -
+*   Output   : -
+*   Function : FreeRTOS task that increments the RTC once per second
+******************************************************************************/
+
 extern INT32U get_uptime_seconds(void);
 /****************************************************************************
 *   Input    : -

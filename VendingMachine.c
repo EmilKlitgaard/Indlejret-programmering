@@ -19,6 +19,7 @@
 
 /***************************** Include files *******************************/
 #include "VendingMachine.h"
+#include "RealTimeClock.h"
 
 /*****************************   Constants   *******************************/
 const Product products[MAX_PRODUCTS] = {
@@ -132,6 +133,7 @@ VendingTransaction* get_current_transaction(void) {
 }
 
 MachineReport* get_machine_report(void) {
+    machine_report.operating_time_seconds = get_uptime_seconds();
     return &machine_report;
 }
 

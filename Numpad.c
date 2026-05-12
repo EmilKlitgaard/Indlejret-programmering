@@ -111,7 +111,7 @@ void numpad_task(void *pvParameters) {
                 last_input = input;
                 if (input > 0) {
                     put_queue(NUMPAD_INPUT, input);
-                    print_var(input);
+                    //print_var(input);
                 }
             }
         }

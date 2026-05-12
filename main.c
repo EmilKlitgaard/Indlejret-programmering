@@ -90,6 +90,7 @@ static void init_hardware(void) {
 }
 
 
+
 int main(void) {
     // Setup all hardware
     init_hardware();
@@ -107,6 +108,7 @@ int main(void) {
     
     // System management tasks
     xTaskCreate(led_manager_task, "LED_Manager", USERTASK_STACK_SIZE, NULL, LOW_PRIO, NULL);            
+    xTaskCreate(rtc_task, "RTC", USERTASK_STACK_SIZE, NULL, LOW_PRIO, NULL);
     
     // Application tasks
     xTaskCreate(application_task, "Application", USERTASK_STACK_SIZE * 2, NULL, MED_PRIO, NULL);

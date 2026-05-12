@@ -33,6 +33,7 @@
 #include "LedManager.h"
 #include "Sleep.h"
 #include "UARTLogger.h"
+#include "VendingMachine.h"
 
 /*****************************   Constants   *******************************/
 
@@ -127,10 +128,55 @@ static void render_slider_line(char *line, const char *title) {
     }
     line[0] = '<';
     line[15] = '>';
-    for (i = 2, j = 0; (i < 15) && (title[j] != '\0'); i++, j++) {
+    for (i=2, j=0; (i<15) && (title[j] != '\0'); i++, j++) {
         line[i] = title[j];
     }
     line[16] = '\0';
+}
+
+/**
+ * Render a product slider line with dynamic product name and price from VendingMachine
+ * Uses get_product_price() to get the current mutable price
+ */
+static void render_product_slider_line(char *line, INT8U product_id) {
+    char product_str[17];
+    const Product *product = &products[product_id];
+    INT16U price = get_product_price(product_id);
+    INT8U i = 0;
+    
+    /* Copy product name */
+    while (product->name[i] != '\0' && i < 10) {
+        product_str[i] = product->name[i];
+        i++;
+    }
+    
+    /* Add colon and space */
+    product_str[i++] = ':';
+    product_str[i++] = ' ';
+    
+    /* Format and append price */
+    if (price < 10) {
+        product_str[i++] = '0' + price;
+    } else if (price < 100) {
+        product_str[i++] = '0' + (price / 10);
+        product_str[i++] = '0' + (price % 10);
+    } else {
+        product_str[i++] = '0' + (price / 100);
+        product_str[i++] = '0' + ((price / 10) % 10);
+        product_str[i++] = '0' + (price % 10);
+    }
+    
+    /* Add unit suffix for Filter product */
+    if (product_id == PRODUCT_FILTER) {
+        product_str[i++] = '/';
+        product_str[i++] = 'c';
+        product_str[i++] = 'l';
+    }
+    
+    product_str[i] = '\0';
+    
+    /* Render as slider line */
+    render_slider_line(line, product_str);
 }
 
 /**
@@ -208,7 +254,7 @@ static void display_product_menu(MenuState *menu) {
     
     clear_display();
     write_str_at(0, 0, "Select coffee:");
-    render_slider_line(line, PRODUCT_TITLES[menu->current_index]);
+    render_product_slider_line(line, menu->current_index);
     write_str_at(0, 1, line);
     
     menu->last_rendered_index = menu->current_index;
@@ -705,6 +751,12 @@ static void handle_state_complete(void) {
         
     // Reset and return to idle when cup is removed (simulated by pressing SW1 again)
     if (button_pressed(BUTTON_INPUT_SW1)) {
+        // For filter coffee: Calculate total amount based on dispensed CL and unit price
+        if (app.selected_product == PRODUCT_FILTER) {
+            INT32U total = app.production_state.dispensed_cl * get_product_price(PRODUCT_FILTER);
+            app.transaction->amount_required = total;
+        }
+
         log_transaction(app.payment_method, app.transaction->amount_paid);
         log_transaction_uart(app.selected_product, app.transaction->amount_required, app.transaction->amount_paid, app.payment_method);
         reset_transaction();

@@ -126,7 +126,7 @@ void encoder_task(void *pvParameters) {
             // Only update state and print if rotation was detected
             if (value != INVALID_ENCODER_VALUE) {
                 put_queue(ENCODER_INPUT, value);
-                print_var(value);
+                //print_var(value);
                 sleep_ms(ENCODER_SLEEP_MS);  // Debounce delay after detecting rotation
             }
         }
